@@ -1,6 +1,25 @@
 FROM mcr.microsoft.com/dotnet/core/sdk:2.2-alpine AS build
-WORKDIR /app
 
+################################################################
+# Install tools from the alpine package registry that might be
+# needed while running jenkins tasks.
+################################################################
+RUN \
+  apk add --no-cache wget ca-certificates openssl icu-libs curl bash dotnet-sdk; \
+  mkdir -p /root/core
+
+################################################################
+# Install EMC root certificates into certificate stores.
+################################################################
+COPY Certificates /root/certificates
+RUN \
+  cd /root/certificates; \
+  find . -type f -name '*.cer' \
+    -exec cp {} /usr/local/share/ca-certificates/$(basename '{}' .cer).crt ';' \
+    -exec keytool -import -trustcacerts -file '{}' -keystore "/etc/ssl/certs/java/cacerts" -storepass changeit -noprompt -alias "$(basename '{}' .cer)" ';'; \
+  update-ca-certificates
+
+WORKDIR /app/
 # copy csproj and restore as distinct layers
 COPY dotnetapp/*.csproj ./dotnetapp/
 COPY utils/*.csproj ./utils/
